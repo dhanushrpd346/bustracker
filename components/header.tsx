@@ -1,6 +1,6 @@
 "use client"
 
-import { Bus, Search, X } from "lucide-react"
+import { Bus, Search, X, UserCircle } from "lucide-react"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 
@@ -11,9 +11,10 @@ interface HeaderProps {
   searchValue?: string
   onSearchChange?: (value: string) => void
   searchPlaceholder?: string
+  onProfileClick?: () => void
 }
 
-export function Header({ title, subtitle, showSearch, searchValue, onSearchChange, searchPlaceholder }: HeaderProps) {
+export function Header({ title, subtitle, showSearch, searchValue, onSearchChange, searchPlaceholder, onProfileClick }: HeaderProps) {
   const [searchOpen, setSearchOpen] = useState(false)
 
   return (
@@ -53,15 +54,26 @@ export function Header({ title, subtitle, showSearch, searchValue, onSearchChang
                 )}
               </div>
             </div>
-            {showSearch && (
-              <button
-                onClick={() => setSearchOpen(true)}
-                className="rounded-xl p-2.5 text-primary-foreground/70 hover:bg-primary-foreground/10 hover:text-primary-foreground transition-colors"
-                aria-label="Open search"
-              >
-                <Search className="h-5 w-5" />
-              </button>
-            )}
+            <div className="flex items-center gap-1">
+              {showSearch && (
+                <button
+                  onClick={() => setSearchOpen(true)}
+                  className="rounded-xl p-2.5 text-primary-foreground/70 hover:bg-primary-foreground/10 hover:text-primary-foreground transition-colors"
+                  aria-label="Open search"
+                >
+                  <Search className="h-5 w-5" />
+                </button>
+              )}
+              {onProfileClick && (
+                <button
+                  onClick={onProfileClick}
+                  className="rounded-xl p-2.5 text-primary-foreground/70 hover:bg-primary-foreground/10 hover:text-primary-foreground transition-colors"
+                  aria-label="Open profile"
+                >
+                  <UserCircle className="h-5 w-5" />
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>

@@ -1,23 +1,21 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Bus as BusType, BUS_STOPS, BUS_ROUTES, generateBuses, getRouteByNumber } from "@/lib/bus-data"
+import dynamic from "next/dynamic"
+import { Bus as BusType, BUS_ROUTES, generateBuses, getRouteByNumber } from "@/lib/bus-data"
 import { Header } from "./header"
 import { BusDetailSheet } from "./bus-detail-sheet"
 import { cn } from "@/lib/utils"
-import {
-  Bus, MapPin, Navigation, Minus, Plus, Users, Clock,
-  ChevronDown, Locate, RefreshCw, Layers
-} from "lucide-react"
+import { Users, Clock, RefreshCw, Layers, Loader2 } from "lucide-react"
 
-const MAP_CENTER = { lat: 8.7284, lng: 77.7066 }
-const MAP_BOUNDS = { latMin: 8.700, latMax: 8.750, lngMin: 77.690, lngMax: 77.740 }
-
-function latLngToXY(lat: number, lng: number, width: number, height: number) {
-  const x = ((lng - MAP_BOUNDS.lngMin) / (MAP_BOUNDS.lngMax - MAP_BOUNDS.lngMin)) * width
-  const y = ((MAP_BOUNDS.latMax - lat) / (MAP_BOUNDS.latMax - MAP_BOUNDS.latMin)) * height
-  return { x, y }
-}
+const LeafletMap = dynamic(() => import("./leaflet-map").then((m) => m.LeafletMap), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-full w-full items-center justify-center bg-secondary/50">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  ),
+})
 
 function CrowdBadge({ level }: { level: string }) {
   const config = {
@@ -34,11 +32,14 @@ function CrowdBadge({ level }: { level: string }) {
   )
 }
 
-export function MapView() {
+interface MapViewProps {
+  onProfileClick?: () => void
+}
+
+export function MapView({ onProfileClick }: MapViewProps) {
   const [buses, setBuses] = useState<BusType[]>([])
   const [selectedBus, setSelectedBus] = useState<BusType | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
-  const [zoom, setZoom] = useState(1)
   const [filterRoute, setFilterRoute] = useState<string>("all")
   const [showStops, setShowStops] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -57,8 +58,6 @@ export function MapView() {
   }, [refreshBuses])
 
   const filteredBuses = filterRoute === "all" ? buses : buses.filter(b => b.routeNumber === filterRoute)
-  const mapWidth = 800 * zoom
-  const mapHeight = 600 * zoom
 
   const handleBusClick = (bus: BusType) => {
     setSelectedBus(bus)
@@ -67,7 +66,7 @@ export function MapView() {
 
   return (
     <div className="flex h-full flex-col">
-      <Header title="Live Tracking" subtitle="Real-time bus locations" />
+      <Header title="Live Tracking" subtitle="Real-time bus locations" onProfileClick={onProfileClick} />
 
       {/* Route filter chips */}
       <div className="flex-shrink-0 border-b border-border bg-card px-4 py-2.5">
@@ -104,143 +103,10 @@ export function MapView() {
 
       {/* Map area */}
       <div className="relative flex-1 overflow-hidden bg-secondary/50">
-        <div className="h-full w-full overflow-auto">
-          <svg
-            width={mapWidth}
-            height={mapHeight}
-            viewBox={`0 0 ${mapWidth} ${mapHeight}`}
-            className="min-h-full min-w-full"
-            role="img"
-            aria-label="Bus tracking map of Tirunelveli"
-          >
-            {/* Background grid */}
-            <defs>
-              <pattern id="grid" width={40 * zoom} height={40 * zoom} patternUnits="userSpaceOnUse">
-                <path d={`M ${40 * zoom} 0 L 0 0 0 ${40 * zoom}`} fill="none" stroke="currentColor" strokeWidth="0.5" className="text-border" />
-              </pattern>
-              <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-                <feDropShadow dx="0" dy="1" stdDeviation="2" floodOpacity="0.15" />
-              </filter>
-            </defs>
-            <rect width={mapWidth} height={mapHeight} fill="url(#grid)" />
-
-            {/* Road lines between connected stops */}
-            {BUS_ROUTES.map((route) => {
-              const points = route.stops.map(sid => {
-                const stop = BUS_STOPS.find(s => s.id === sid)!
-                return latLngToXY(stop.lat, stop.lng, mapWidth, mapHeight)
-              })
-              return (
-                <g key={route.id}>
-                  <polyline
-                    points={points.map(p => `${p.x},${p.y}`).join(" ")}
-                    fill="none"
-                    stroke={route.color}
-                    strokeWidth={3 * zoom}
-                    strokeOpacity={0.2}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <polyline
-                    points={points.map(p => `${p.x},${p.y}`).join(" ")}
-                    fill="none"
-                    stroke={route.color}
-                    strokeWidth={1.5 * zoom}
-                    strokeOpacity={0.5}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeDasharray={`${8 * zoom} ${4 * zoom}`}
-                  />
-                </g>
-              )
-            })}
-
-            {/* Bus stops */}
-            {showStops && BUS_STOPS.map((stop) => {
-              const { x, y } = latLngToXY(stop.lat, stop.lng, mapWidth, mapHeight)
-              return (
-                <g key={stop.id}>
-                  <circle cx={x} cy={y} r={6 * zoom} className="fill-card stroke-primary" strokeWidth={2 * zoom} filter="url(#shadow)" />
-                  <circle cx={x} cy={y} r={2.5 * zoom} className="fill-primary" />
-                  {zoom >= 1 && (
-                    <text
-                      x={x}
-                      y={y + 14 * zoom}
-                      textAnchor="middle"
-                      className="fill-foreground text-[9px] font-medium"
-                      style={{ fontSize: `${9 * zoom}px` }}
-                    >
-                      {stop.name.length > 15 ? stop.name.slice(0, 15) + "..." : stop.name}
-                    </text>
-                  )}
-                </g>
-              )
-            })}
-
-            {/* Buses */}
-            {filteredBuses.map((bus) => {
-              const { x, y } = latLngToXY(bus.lat, bus.lng, mapWidth, mapHeight)
-              const route = getRouteByNumber(bus.routeNumber)
-              const color = route?.color || "#2563eb"
-              return (
-                <g
-                  key={bus.id}
-                  onClick={() => handleBusClick(bus)}
-                  className="cursor-pointer"
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`Bus route ${bus.routeNumber}, next stop ${bus.nextStop}, ETA ${bus.eta} minutes`}
-                >
-                  {/* Pulse ring */}
-                  <circle cx={x} cy={y} r={14 * zoom} fill={color} opacity={0.15} className="animate-pulse-dot" />
-                  {/* Bus marker */}
-                  <rect
-                    x={x - 12 * zoom}
-                    y={y - 10 * zoom}
-                    width={24 * zoom}
-                    height={20 * zoom}
-                    rx={6 * zoom}
-                    fill={color}
-                    filter="url(#shadow)"
-                  />
-                  <text
-                    x={x}
-                    y={y + 1 * zoom}
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    fill="white"
-                    style={{ fontSize: `${9 * zoom}px`, fontWeight: 700 }}
-                  >
-                    {bus.routeNumber}
-                  </text>
-                  {/* ETA label */}
-                  <rect
-                    x={x + 10 * zoom}
-                    y={y - 18 * zoom}
-                    width={28 * zoom}
-                    height={14 * zoom}
-                    rx={4 * zoom}
-                    className="fill-card"
-                    filter="url(#shadow)"
-                  />
-                  <text
-                    x={x + 24 * zoom}
-                    y={y - 11 * zoom}
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    className="fill-foreground"
-                    style={{ fontSize: `${7 * zoom}px`, fontWeight: 600 }}
-                  >
-                    {bus.eta}m
-                  </text>
-                </g>
-              )
-            })}
-          </svg>
-        </div>
+        <LeafletMap buses={filteredBuses} showStops={showStops} onBusClick={handleBusClick} />
 
         {/* Map controls */}
-        <div className="absolute right-3 top-3 flex flex-col gap-2">
+        <div className="absolute right-3 top-3 z-[1000] flex flex-col gap-2">
           <button
             onClick={refreshBuses}
             className={cn(
@@ -261,24 +127,10 @@ export function MapView() {
           >
             <Layers className="h-4 w-4" />
           </button>
-          <button
-            onClick={() => setZoom(Math.min(zoom + 0.25, 2))}
-            className="flex h-10 w-10 items-center justify-center rounded-xl bg-card shadow-lg"
-            aria-label="Zoom in"
-          >
-            <Plus className="h-4 w-4 text-foreground" />
-          </button>
-          <button
-            onClick={() => setZoom(Math.max(zoom - 0.25, 0.5))}
-            className="flex h-10 w-10 items-center justify-center rounded-xl bg-card shadow-lg"
-            aria-label="Zoom out"
-          >
-            <Minus className="h-4 w-4 text-foreground" />
-          </button>
         </div>
 
         {/* Live indicator */}
-        <div className="absolute left-3 top-3 flex items-center gap-2 rounded-xl bg-card px-3 py-2 shadow-lg">
+        <div className="absolute left-3 top-3 z-[1000] flex items-center gap-2 rounded-xl bg-card px-3 py-2 shadow-lg">
           <span className="relative flex h-2.5 w-2.5">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75" />
             <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-success" />
@@ -287,7 +139,7 @@ export function MapView() {
         </div>
 
         {/* Quick bus list at bottom */}
-        <div className="absolute bottom-0 left-0 right-0 bg-card/95 backdrop-blur-lg border-t border-border">
+        <div className="absolute bottom-0 left-0 right-0 z-[1000] bg-card/95 backdrop-blur-lg border-t border-border">
           <div className="mx-auto max-w-lg">
             <div className="scrollbar-hide flex gap-3 overflow-x-auto p-3">
               {filteredBuses.slice(0, 8).map((bus) => {

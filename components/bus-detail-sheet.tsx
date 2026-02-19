@@ -1,8 +1,10 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Bus as BusType, getRouteByNumber, getStopsForRoute } from "@/lib/bus-data"
+import { isRouteSaved, saveRoute, removeSavedRoute } from "@/lib/profile-data"
 import { cn } from "@/lib/utils"
-import { Bus, Clock, MapPin, Users, Gauge, User, Hash, ChevronRight, X, Navigation } from "lucide-react"
+import { Bus, Clock, MapPin, Users, Gauge, User, Hash, ChevronRight, X, Navigation, Bookmark } from "lucide-react"
 
 interface BusDetailSheetProps {
   bus: BusType | null
@@ -40,10 +42,30 @@ function CrowdIndicator({ level }: { level: string }) {
 }
 
 export function BusDetailSheet({ bus, open, onOpenChange }: BusDetailSheetProps) {
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    if (bus && open) {
+      const route = getRouteByNumber(bus.routeNumber)
+      if (route) setSaved(isRouteSaved(route.id))
+    }
+  }, [bus, open])
+
   if (!bus || !open) return null
 
   const route = getRouteByNumber(bus.routeNumber)
   const stops = route ? getStopsForRoute(route.id) : []
+
+  const handleToggleSave = () => {
+    if (!route) return
+    if (saved) {
+      removeSavedRoute(route.id)
+      setSaved(false)
+    } else {
+      saveRoute(route.id)
+      setSaved(true)
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center">
@@ -61,14 +83,28 @@ export function BusDetailSheet({ bus, open, onOpenChange }: BusDetailSheetProps)
           <div className="h-1 w-10 rounded-full bg-muted" />
         </div>
 
-        {/* Close button */}
-        <button
-          onClick={() => onOpenChange(false)}
-          className="absolute right-3 top-3 rounded-xl p-2 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
-          aria-label="Close detail sheet"
-        >
-          <X className="h-5 w-5" />
-        </button>
+        {/* Action buttons */}
+        <div className="absolute right-3 top-3 flex items-center gap-1">
+          <button
+            onClick={handleToggleSave}
+            className={cn(
+              "rounded-xl p-2 transition-colors",
+              saved
+                ? "text-primary bg-primary/10"
+                : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+            )}
+            aria-label={saved ? "Remove from saved routes" : "Save route"}
+          >
+            <Bookmark className={cn("h-5 w-5", saved && "fill-current")} />
+          </button>
+          <button
+            onClick={() => onOpenChange(false)}
+            className="rounded-xl p-2 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+            aria-label="Close detail sheet"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
 
         <div className="max-h-[70vh] overflow-y-auto px-4 pb-4">
           {/* Bus header */}
