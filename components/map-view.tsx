@@ -6,27 +6,30 @@ import { Bus as BusType, BUS_ROUTES, generateBuses, getRouteByNumber } from "@/l
 import { Header } from "./header"
 import { BusDetailSheet } from "./bus-detail-sheet"
 import { cn } from "@/lib/utils"
-import { Users, Clock, RefreshCw, Layers, Loader2 } from "lucide-react"
+import { Users, Clock, RefreshCw, Layers, Loader2, Navigation } from "lucide-react"
 
 const LeafletMap = dynamic(() => import("./leaflet-map").then((m) => m.LeafletMap), {
   ssr: false,
   loading: () => (
-    <div className="flex h-full w-full items-center justify-center bg-secondary/50">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    <div className="flex h-full w-full items-center justify-center bg-secondary/30">
+      <div className="flex flex-col items-center gap-3">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="text-xs font-medium text-muted-foreground">Loading map...</span>
+      </div>
     </div>
   ),
 })
 
 function CrowdBadge({ level }: { level: string }) {
   const config = {
-    low: { label: "Low", className: "bg-success text-success-foreground" },
-    medium: { label: "Med", className: "bg-warning text-warning-foreground" },
-    high: { label: "Full", className: "bg-destructive text-primary-foreground" },
+    low: { label: "Low", dot: "bg-emerald-500" },
+    medium: { label: "Med", dot: "bg-amber-500" },
+    high: { label: "Full", dot: "bg-red-500" },
   }
   const c = config[level as keyof typeof config] || config.low
   return (
-    <span className={cn("inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold", c.className)}>
-      <Users className="h-2.5 w-2.5" />
+    <span className="inline-flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground">
+      <span className={cn("h-1.5 w-1.5 rounded-full", c.dot)} />
       {c.label}
     </span>
   )
@@ -66,35 +69,39 @@ export function MapView({ onProfileClick }: MapViewProps) {
 
   return (
     <div className="flex h-full flex-col">
-      <Header title="Live Tracking" subtitle="Real-time bus locations" onProfileClick={onProfileClick} />
+      <Header title="Live Map" subtitle="Real-time tracking" onProfileClick={onProfileClick} />
 
       {/* Route filter chips */}
-      <div className="flex-shrink-0 border-b border-border bg-card px-4 py-2.5">
+      <div className="flex-shrink-0 border-b border-border bg-card px-4 py-2">
         <div className="mx-auto max-w-lg">
-          <div className="scrollbar-hide flex gap-2 overflow-x-auto">
+          <div className="scrollbar-hide flex gap-1.5 overflow-x-auto">
             <button
               onClick={() => setFilterRoute("all")}
               className={cn(
-                "flex-shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-all",
+                "flex-shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all",
                 filterRoute === "all"
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-foreground text-background shadow-sm"
                   : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
               )}
             >
-              All Buses
+              All
             </button>
             {BUS_ROUTES.map(route => (
               <button
                 key={route.id}
                 onClick={() => setFilterRoute(route.number)}
                 className={cn(
-                  "flex-shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-all",
+                  "flex-shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all flex items-center gap-1.5",
                   filterRoute === route.number
-                    ? "bg-primary text-primary-foreground"
+                    ? "bg-foreground text-background shadow-sm"
                     : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
                 )}
               >
-                Route {route.number}
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{ backgroundColor: route.color }}
+                />
+                {route.number}
               </button>
             ))}
           </div>
@@ -102,7 +109,7 @@ export function MapView({ onProfileClick }: MapViewProps) {
       </div>
 
       {/* Map area */}
-      <div className="relative flex-1 overflow-hidden bg-secondary/50">
+      <div className="relative flex-1 overflow-hidden">
         <LeafletMap buses={filteredBuses} showStops={showStops} onBusClick={handleBusClick} />
 
         {/* Map controls */}
@@ -110,7 +117,7 @@ export function MapView({ onProfileClick }: MapViewProps) {
           <button
             onClick={refreshBuses}
             className={cn(
-              "flex h-10 w-10 items-center justify-center rounded-xl bg-card shadow-lg transition-transform",
+              "flex h-10 w-10 items-center justify-center rounded-full bg-card shadow-md border border-border transition-all hover:shadow-lg",
               isRefreshing && "animate-spin"
             )}
             aria-label="Refresh bus locations"
@@ -120,8 +127,8 @@ export function MapView({ onProfileClick }: MapViewProps) {
           <button
             onClick={() => setShowStops(!showStops)}
             className={cn(
-              "flex h-10 w-10 items-center justify-center rounded-xl shadow-lg transition-colors",
-              showStops ? "bg-primary text-primary-foreground" : "bg-card text-foreground"
+              "flex h-10 w-10 items-center justify-center rounded-full shadow-md border border-border transition-all hover:shadow-lg",
+              showStops ? "bg-primary text-primary-foreground border-primary" : "bg-card text-foreground"
             )}
             aria-label="Toggle stops"
           >
@@ -130,41 +137,43 @@ export function MapView({ onProfileClick }: MapViewProps) {
         </div>
 
         {/* Live indicator */}
-        <div className="absolute left-3 top-3 z-[1000] flex items-center gap-2 rounded-xl bg-card px-3 py-2 shadow-lg">
-          <span className="relative flex h-2.5 w-2.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75" />
-            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-success" />
+        <div className="absolute left-3 top-3 z-[1000] flex items-center gap-2 rounded-full bg-card px-3 py-1.5 shadow-md border border-border">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
           </span>
-          <span className="text-xs font-semibold text-foreground">{filteredBuses.length} buses live</span>
+          <span className="text-[11px] font-semibold text-foreground">{filteredBuses.length} live</span>
         </div>
 
-        {/* Quick bus list at bottom */}
-        <div className="absolute bottom-0 left-0 right-0 z-[1000] bg-card/95 backdrop-blur-lg border-t border-border">
-          <div className="mx-auto max-w-lg">
-            <div className="scrollbar-hide flex gap-3 overflow-x-auto p-3">
+        {/* Bottom bus cards */}
+        <div className="absolute bottom-0 left-0 right-0 z-[1000]">
+          <div className="mx-auto max-w-lg px-3 pb-3">
+            <div className="scrollbar-hide flex gap-2 overflow-x-auto pb-1">
               {filteredBuses.slice(0, 8).map((bus) => {
                 const route = getRouteByNumber(bus.routeNumber)
                 return (
                   <button
                     key={bus.id}
                     onClick={() => handleBusClick(bus)}
-                    className="flex flex-shrink-0 items-center gap-3 rounded-xl bg-secondary/80 px-3 py-2.5 transition-colors hover:bg-secondary"
+                    className="flex flex-shrink-0 items-center gap-2.5 rounded-2xl bg-card/95 backdrop-blur-md px-3 py-2.5 shadow-lg border border-border/50 transition-all hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]"
                   >
                     <div
-                      className="flex h-9 w-9 items-center justify-center rounded-lg text-sm font-bold text-primary-foreground"
+                      className="flex h-10 w-10 items-center justify-center rounded-xl text-xs font-bold text-white shadow-sm"
                       style={{ backgroundColor: route?.color || "#2563eb" }}
                     >
                       {bus.routeNumber}
                     </div>
                     <div className="text-left">
-                      <p className="text-xs font-semibold text-foreground">{bus.nextStop}</p>
-                      <div className="flex items-center gap-2">
+                      <p className="text-xs font-semibold text-foreground leading-tight">{bus.nextStop}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
                         <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                          <Clock className="h-2.5 w-2.5" /> {bus.eta} min
+                          <Clock className="h-2.5 w-2.5" /> {bus.eta}m
                         </span>
+                        <span className="text-border">|</span>
                         <CrowdBadge level={bus.crowdLevel} />
                       </div>
                     </div>
+                    <Navigation className="h-3.5 w-3.5 text-muted-foreground/50 ml-1" />
                   </button>
                 )
               })}
