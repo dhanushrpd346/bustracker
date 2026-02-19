@@ -1,10 +1,18 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useId } from "react"
 import L from "leaflet"
 import { MapContainer, TileLayer, Polyline, CircleMarker, Marker, Popup, useMap } from "react-leaflet"
 import "leaflet/dist/leaflet.css"
-import { Bus as BusType, BusStop, BusRoute, BUS_STOPS, BUS_ROUTES, getRouteByNumber } from "@/lib/bus-data"
+import { Bus as BusType, BUS_STOPS, BUS_ROUTES, getRouteByNumber } from "@/lib/bus-data"
+
+// Fix default Leaflet marker icon issue
+delete (L.Icon.Default.prototype as any)._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
+  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
+  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+})
 
 interface LeafletMapProps {
   buses: BusType[]
@@ -151,13 +159,17 @@ function FitBounds({ buses }: { buses: BusType[] }) {
 }
 
 export function LeafletMap({ buses, showStops, onBusClick }: LeafletMapProps) {
+  const mapId = useId()
+
   return (
     <MapContainer
+      key={mapId}
       center={[8.7284, 77.7066]}
       zoom={14}
       className="h-full w-full"
       zoomControl={false}
       attributionControl={false}
+      style={{ height: "100%", width: "100%" }}
     >
       <TileLayer
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
